@@ -395,7 +395,7 @@ def main():
 
 
 
-        #if i%25 != 0: ### TODO generate only every 25th im
+        # if i%25 != 0: ### TODO generate only every 25th im
         #if i != 511: ### TODO generate only every 25th im
         #    continue
         start = time.time()
@@ -428,8 +428,8 @@ def main():
                     #print("found latent code for this image")
                     index_of_image_after_train_shuffle = idx_map[100+i,1]
             elif ablate == 'view_dir':
-                pose = render_poses[100]
-                expression = render_expressions[100]
+                pose = render_poses[i]
+                expression = render_expressions[i]
                 _, ray_directions_ablation = get_ray_bundle(hwf[0], hwf[1], hwf[2], render_poses[240+i][:3, :4])
 
             pose = pose[:3, :4]
