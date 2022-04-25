@@ -205,6 +205,9 @@ def main():
         "--config", type=str, required=True, help="Path to (.yml) config file."
     )
     parser.add_argument(
+        "--driving_config", type=str, required=True, help="Path to (.yml) config file."
+    )
+    parser.add_argument(
         "--checkpoint",
         type=str,
         required=True,
@@ -220,12 +223,17 @@ def main():
         "--save-error-image", action="store_true", help="Save photometric error visualization"
     )
     configargs = parser.parse_args()
+    driving_configargs = parser.parse_args()
 
     # Read config file.
     cfg = None
+    driving_cfg = None
     with open(configargs.config, "r") as f:
         cfg_dict = yaml.load(f, Loader=yaml.FullLoader)
         cfg = CfgNode(cfg_dict)
+    with open(configargs.driving_config, "r") as f:
+        driving_cfg_dict = yaml.load(f, Loader=yaml.FullLoader)
+        driving_cfg = CfgNode(driving_cfg_dict)
 
     images, poses, render_poses, hwf = None, None, None, None
     i_train, i_val, i_test = None, None, None
@@ -235,6 +243,12 @@ def main():
             cfg.dataset.basedir,
             half_res=cfg.dataset.half_res,
             testskip=cfg.dataset.testskip,
+            test=True
+        )
+        _, _, _, _, _, driving_expressions, _, _ = load_flame_data(
+            driving_cfg.dataset.basedir,
+            half_res=driving_cfg.dataset.half_res,
+            testskip=driving_cfg.dataset.testskip,
             test=True
         )
         #i_train, i_val, i_test = i_split
@@ -361,7 +375,7 @@ def main():
     #render_poses = render_poses.float().to(device)
     render_poses = poses[i_test].float().to(device)
     #expressions = torch.arange(-6,6,0.5).float().to(device)
-    render_expressions = expressions[i_test].float().to(device)
+    render_expressions = driving_expressions[i_test].float().to(device)
     #avg_img = torch.mean(images[i_train],axis=0)
     #avg_img = torch.ones_like(avg_img)
 
