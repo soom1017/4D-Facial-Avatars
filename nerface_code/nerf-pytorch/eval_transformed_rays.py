@@ -239,13 +239,13 @@ def main():
     i_train, i_val, i_test = None, None, None
     if cfg.dataset.type.lower() == "blender":
         # Load blender dataset
-        images, poses, render_poses, hwf, i_split, expressions, _, _ = load_flame_data(
+        images, _, _, _, i_split, expressions, _, _ = load_flame_data(
             cfg.dataset.basedir,
             half_res=cfg.dataset.half_res,
             testskip=cfg.dataset.testskip,
             test=True
         )
-        _, _, _, _, _, driving_expressions, _, _ = load_flame_data(
+        _, poses, render_poses, hwf, _, _, _, _ = load_flame_data(
             driving_cfg.dataset.basedir,
             half_res=driving_cfg.dataset.half_res,
             testskip=driving_cfg.dataset.testskip,
@@ -375,7 +375,7 @@ def main():
     #render_poses = render_poses.float().to(device)
     render_poses = poses[i_test].float().to(device)
     #expressions = torch.arange(-6,6,0.5).float().to(device)
-    render_expressions = driving_expressions[i_test].float().to(device)
+    render_expressions = expressions[i_test].float().to(device)
     #avg_img = torch.mean(images[i_train],axis=0)
     #avg_img = torch.ones_like(avg_img)
 
