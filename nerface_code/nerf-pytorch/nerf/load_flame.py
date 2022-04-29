@@ -101,7 +101,8 @@ def load_flame_data(basedir, half_res=False, testskip=1, debug=False, expression
             all_expressions.append(expressions)
             all_ids.append(ids)
             all_bboxs.append(bboxs)
-            
+    for i in range(1, len(counts)):
+        counts[i] += counts[i-1]
     counts.insert(0, 0)    
     i_split = [np.arange(counts[i], counts[i + 1]) for i in range(len(splits))]
 
@@ -154,6 +155,7 @@ def load_flame_data(basedir, half_res=False, testskip=1, debug=False, expression
 
     poses = torch.from_numpy(poses)
     expressions = torch.from_numpy(expressions)
+    ids = torch.from_numpy(ids)
     bboxs[:,0:2] *= H
     bboxs[:,2:4] *= W
     bboxs = np.floor(bboxs)

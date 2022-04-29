@@ -197,6 +197,7 @@ class ConditionalBlendshapePaperNeRFModel(torch.nn.Module):
         skip_connect_every=4,
         num_encoding_fn_xyz=6,
         num_encoding_fn_dir=4,
+        num_identity=3,
         include_input_xyz=True,
         include_input_dir=True,
         use_viewdirs=True,
@@ -213,15 +214,16 @@ class ConditionalBlendshapePaperNeRFModel(torch.nn.Module):
         self.dim_xyz = include_input_xyz + 2 * 3 * num_encoding_fn_xyz
         self.dim_dir = include_input_dir + 2 * 3 * num_encoding_fn_dir
         self.dim_expression = include_expression# + 2 * 3 * num_encoding_fn_expr
+        self.dim_id_embedding = 16
         self.dim_latent_code = latent_code_dim
 
         self.layers_xyz = torch.nn.ModuleList()
         self.use_viewdirs = use_viewdirs
-        self.identity_embed = torch.nn.Embedding(1, 16)
-        self.layers_xyz.append(torch.nn.Linear(self.dim_xyz + self.dim_expression + self.dim_latent_code, 256))
+        self.identity_embed = torch.nn.Embedding(num_identity, 16)
+        self.layers_xyz.append(torch.nn.Linear(self.dim_xyz + self.dim_expression + self.dim_id_embedding + self.dim_latent_code, 256))
         for i in range(1, 6):
             if i == 3:
-                self.layers_xyz.append(torch.nn.Linear(self.dim_xyz + self.dim_expression + self.dim_latent_code + 256, 256))
+                self.layers_xyz.append(torch.nn.Linear(self.dim_xyz + self.dim_expression + self.dim_id_embedding + self.dim_latent_code + 256, 256))
             else:
                 self.layers_xyz.append(torch.nn.Linear(256, 256))
         self.fc_feat = torch.nn.Linear(256, 256)
@@ -239,7 +241,7 @@ class ConditionalBlendshapePaperNeRFModel(torch.nn.Module):
         x = xyz#self.relu(self.layers_xyz[0](xyz))
         latent_code = latent_code.repeat(xyz.shape[0], 1)
         id_embedding = self.identity_embed(id)
-        id_embedding = id.repeat(xyz.shape[0], 1)
+        id_embedding = id_embedding.repeat(xyz.shape[0], 1)
         if self.dim_expression > 0:
             expr_encoding = (expr * 1 / 3).repeat(xyz.shape[0], 1)
             initial = torch.cat((xyz, expr_encoding, id_embedding, latent_code), dim=1)
