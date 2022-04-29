@@ -6,7 +6,7 @@ from .nerf_helpers import dump_rays
 from .volume_rendering_utils import volume_render_radiance_field
 
 
-def run_network(network_fn, pts, ray_batch, chunksize, embed_fn, embeddirs_fn, expressions = None, latent_code = None):
+def run_network(network_fn, pts, ray_batch, chunksize, embed_fn, embeddirs_fn, expressions = None, ids=None, latent_code = None):
 
     pts_flat = pts.reshape((-1, pts.shape[-1]))
     embedded = embed_fn(pts_flat)
@@ -19,11 +19,11 @@ def run_network(network_fn, pts, ray_batch, chunksize, embed_fn, embeddirs_fn, e
 
     batches = get_minibatches(embedded, chunksize=chunksize)
     if expressions is None:
-        preds = [network_fn(batch) for batch in batches]
+        preds = [network_fn(batch, ids) for batch in batches]
     elif latent_code is not None:
-        preds = [network_fn(batch, expressions, latent_code) for batch in batches]
+        preds = [network_fn(batch, ids, expressions, latent_code) for batch in batches]
     else:
-        preds = [network_fn(batch, expressions) for batch in batches]
+        preds = [network_fn(batch, ids, expressions) for batch in batches]
     radiance_field = torch.cat(preds, dim=0)
     radiance_field = radiance_field.reshape(
         list(pts.shape[:-1]) + [radiance_field.shape[-1]]
@@ -42,6 +42,7 @@ def predict_and_render_radiance(
     encode_position_fn=None,
     encode_direction_fn=None,
     expressions = None,
+    ids = None,
     background_prior = None,
     latent_code = None,
     # ray_dirs_fake = None
@@ -88,6 +89,7 @@ def predict_and_render_radiance(
         encode_position_fn,
         encode_direction_fn,
         expressions,
+        ids,
         latent_code
     )
     # make last RGB values of each ray, the background
@@ -134,6 +136,7 @@ def predict_and_render_radiance(
             encode_position_fn,
             encode_direction_fn,
             expressions,
+            ids,
             latent_code
         )
         # make last RGB values of each ray, the background
@@ -174,6 +177,7 @@ def run_one_iter_of_nerf(
     encode_position_fn=None,
     encode_direction_fn=None,
     expressions = None,
+    ids = None,
     background_prior=None,
     latent_code = None,
     ray_directions_ablation = None
@@ -194,32 +198,17 @@ def run_one_iter_of_nerf(
         restore_shapes += restore_shapes
         restore_shapes += [ray_directions.shape[:-1]] # to return fine depth map
     if options.dataset.no_ndc is False:
-        #print("calling ndc")
         ro, rd = ndc_rays(height, width, focal_length, 1.0, ray_origins, ray_directions)
         ro = ro.view((-1, 3))
         rd = rd.view((-1, 3))
     else:
-        #print("calling ndc")
-        #"caling normal rays (not NDC)"
         ro = ray_origins.view((-1, 3))
         rd = ray_directions.view((-1, 3))
-        # rd_ablations = ray_directions_ablation.view((-1, 3))
     near = options.dataset.near * torch.ones_like(rd[..., :1])
     far = options.dataset.far * torch.ones_like(rd[..., :1])
     rays = torch.cat((ro, rd, near, far), dim=-1)
-    # rays_ablation = torch.cat((ro, rd_ablations, near, far), dim=-1)
-    # if options.nerf.use_viewdirs: # TODO uncomment
-    #     rays = torch.cat((rays, viewdirs), dim=-1)
-    #
-    # viewdirs = None  # TODO remove this paragraph
-    # if options.nerf.use_viewdirs:
-    #     # Provide ray directions as input
-    #     # viewdirs = ray_directions_ablation
-    #     viewdirs = viewdirs / viewdirs.norm(p=2, dim=-1).unsqueeze(-1)
-    #     viewdirs = viewdirs.view((-1, 3))
 
 
-    # batches_ablation = get_minibatches(rays_ablation, chunksize=getattr(options.nerf, mode).chunksize)
     batches = get_minibatches(rays, chunksize=getattr(options.nerf, mode).chunksize)
     assert(batches[0].shape == batches[0].shape)
     background_prior = get_minibatches(background_prior, chunksize=getattr(options.nerf, mode).chunksize) if\
@@ -235,9 +224,9 @@ def run_one_iter_of_nerf(
             encode_position_fn=encode_position_fn,
             encode_direction_fn=encode_direction_fn,
             expressions = expressions,
+            ids = ids,
             background_prior = background_prior[i] if background_prior is not None else background_prior,
             latent_code = latent_code,
-            # ray_dirs_fake = batches_ablation
         )
         for i,batch in enumerate(batches)
     ]

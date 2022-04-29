@@ -217,6 +217,7 @@ class ConditionalBlendshapePaperNeRFModel(torch.nn.Module):
 
         self.layers_xyz = torch.nn.ModuleList()
         self.use_viewdirs = use_viewdirs
+        self.identity_embed = torch.nn.Embedding(1, 16)
         self.layers_xyz.append(torch.nn.Linear(self.dim_xyz + self.dim_expression + self.dim_latent_code, 256))
         for i in range(1, 6):
             if i == 3:
@@ -233,13 +234,15 @@ class ConditionalBlendshapePaperNeRFModel(torch.nn.Module):
         self.fc_rgb = torch.nn.Linear(128, 3)
         self.relu = torch.nn.functional.relu
 
-    def forward(self, x,  expr=None, latent_code=None, **kwargs):
+    def forward(self, x, id=None, expr=None, latent_code=None, **kwargs):
         xyz, dirs = x[..., : self.dim_xyz], x[..., self.dim_xyz :]
         x = xyz#self.relu(self.layers_xyz[0](xyz))
         latent_code = latent_code.repeat(xyz.shape[0], 1)
+        id_embedding = self.identity_embed(id)
+        id_embedding = id.repeat(xyz.shape[0], 1)
         if self.dim_expression > 0:
             expr_encoding = (expr * 1 / 3).repeat(xyz.shape[0], 1)
-            initial = torch.cat((xyz, expr_encoding, latent_code), dim=1)
+            initial = torch.cat((xyz, expr_encoding, id_embedding, latent_code), dim=1)
             x = initial
         for i in range(6):
             if i == 3:

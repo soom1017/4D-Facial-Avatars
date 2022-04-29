@@ -40,7 +40,7 @@ def main():
         cfg_dict = yaml.load(f, Loader=yaml.FullLoader)
         cfg = CfgNode(cfg_dict)
 
-    images, poses, render_poses, hwf, i_split, expressions, ids = None, None, None, None, None, None
+    images, poses, render_poses, hwf, i_split, expressions, ids = None, None, None, None, None, None, None
     H, W, focal, i_train, i_val, i_test = None, None, None, None, None, None
 
     # Load dataset
@@ -206,6 +206,7 @@ def main():
         background_ray_values = None
         img_idx = np.random.choice(i_train)
         img_target = images[img_idx].to(device)
+        identity_target = ids[img_idx].to(device)
         pose_target = poses[img_idx, :3, :4].to(device)
         if not disable_expressions:
             expression_target = expressions[img_idx].to(device) # vector
@@ -255,6 +256,7 @@ def main():
             encode_position_fn=encode_position_fn,
             encode_direction_fn=encode_direction_fn,
             expressions = expression_target,
+            ids = identity_target,
             background_prior=background_ray_values,
             latent_code = latent_code if not disable_latent_codes else torch.zeros(32,device=device)
 
@@ -334,6 +336,7 @@ def main():
                 loss = 0
                 for img_idx in i_val[:2]:
                     img_target = images[img_idx].to(device)
+                    identity_target = ids[img_idx].to(device)
 
                     pose_target = poses[img_idx, :3, :4].to(device)
                     ray_origins, ray_directions = get_ray_bundle(
@@ -352,6 +355,7 @@ def main():
                         encode_position_fn=encode_position_fn,
                         encode_direction_fn=encode_direction_fn,
                         expressions = expression_target,
+                        ids = identity_target,
                         background_prior = background.view(-1,3) if fixed_background else None,
                         latent_code = torch.zeros(32).to(device) if train_latent_codes or disable_latent_codes else None,
 
