@@ -51,7 +51,7 @@ def load_flame_data(basedir, half_res=False, testskip=1, debug=False, expression
     all_poses = []
     all_expressions = []
     all_bboxs = []
-    ids = []
+    all_ids = []
 
     splits = ["train", "val", "test"]
     if test:
@@ -69,6 +69,7 @@ def load_flame_data(basedir, half_res=False, testskip=1, debug=False, expression
             imgs = []
             poses = []
             expressions = []
+            ids = []
             bboxs = []
             if s == "train" or testskip == 0:
                 skip = 1
@@ -76,7 +77,7 @@ def load_flame_data(basedir, half_res=False, testskip=1, debug=False, expression
                 skip = testskip
 
             for frame in meta["frames"][::skip]:
-                fname = os.path.join(basedir, frame["file_path"] + ".png")
+                fname = os.path.join(dataset_dir, frame["file_path"] + ".png")
                 imgs.append(imageio.imread(fname))
 
                 poses.append(np.array(frame["transform_matrix"]))
@@ -92,19 +93,22 @@ def load_flame_data(basedir, half_res=False, testskip=1, debug=False, expression
             expressions = np.array(expressions).astype(np.float32)
             bboxs = np.array(bboxs).astype(np.float32)
             # id coef added
-            ids += np.full(imgs.shape[0], i)
+            ids = np.full(imgs.shape[0], i)
 
             counts[j] += imgs.shape[0]
             all_imgs.append(imgs)
             all_poses.append(poses)
             all_expressions.append(expressions)
+            all_ids.append(ids)
             all_bboxs.append(bboxs)
-        
+            
+    counts.insert(0, 0)    
     i_split = [np.arange(counts[i], counts[i + 1]) for i in range(len(splits))]
 
     imgs = np.concatenate(all_imgs, 0)
     poses = np.concatenate(all_poses, 0)
     expressions = np.concatenate(all_expressions, 0)
+    ids = np.concatenate(all_ids, 0)
     bboxs = np.concatenate(all_bboxs, 0)
 
     H, W = imgs[0].shape[:2]
