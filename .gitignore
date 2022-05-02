@@ -3,3 +3,4 @@ __pycache__
 logs
 logs_*
 renders/
+renders_*/
