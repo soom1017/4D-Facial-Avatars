@@ -205,7 +205,7 @@ def main():
         "--config", type=str, required=True, help="Path to (.yml) config file."
     )
     parser.add_argument(
-        "--driving_config", type=str, required=True, help="Path to (.yml) config file."
+        "--identity", type=int, required=True, help="Model has trained with 3 datasets. Set inference identity in (0-2)."
     )
     parser.add_argument(
         "--checkpoint",
@@ -214,7 +214,7 @@ def main():
         help="Checkpoint / pre-trained model to evaluate.",
     )
     parser.add_argument(
-        "--savedir", type=str, default='./renders/', help="Save images to this directory, if specified."
+        "--savedir", type=str, default='./renders_mtm/', help="Save images to this directory, if specified."
     )
     parser.add_argument(
         "--save-disparity-image", action="store_true", help="Save disparity images too."
@@ -223,33 +223,23 @@ def main():
         "--save-error-image", action="store_true", help="Save photometric error visualization"
     )
     configargs = parser.parse_args()
-    driving_configargs = parser.parse_args()
 
     # Read config file.
     cfg = None
-    driving_cfg = None
     with open(configargs.config, "r") as f:
         cfg_dict = yaml.load(f, Loader=yaml.FullLoader)
         cfg = CfgNode(cfg_dict)
-    with open(configargs.driving_config, "r") as f:
-        driving_cfg_dict = yaml.load(f, Loader=yaml.FullLoader)
-        driving_cfg = CfgNode(driving_cfg_dict)
 
-    images, poses, render_poses, hwf = None, None, None, None
-    i_train, i_val, i_test = None, None, None
+    images, poses, render_poses, hwf, ids = None, None, None, None, None
+    i_test = None
     if cfg.dataset.type.lower() == "blender":
         # Load blender dataset
-        images, _, _, _, i_split, expressions, _, _ = load_flame_data(
+        images, poses, render_poses, hwf, i_split, expressions, ids, _ = load_flame_data(
             cfg.dataset.basedir,
             half_res=cfg.dataset.half_res,
             testskip=cfg.dataset.testskip,
-            test=True
-        )
-        _, poses, render_poses, hwf, _, _, _, _ = load_flame_data(
-            driving_cfg.dataset.basedir,
-            half_res=driving_cfg.dataset.half_res,
-            testskip=driving_cfg.dataset.testskip,
-            test=True
+            test=True,
+            id=configargs.identity
         )
         #i_train, i_val, i_test = i_split
         i_test = i_split
@@ -288,6 +278,7 @@ def main():
     model_coarse = getattr(models, cfg.models.coarse.type)(
         num_encoding_fn_xyz=cfg.models.coarse.num_encoding_fn_xyz,
         num_encoding_fn_dir=cfg.models.coarse.num_encoding_fn_dir,
+        num_identity=cfg.dataset.num_identity,
         include_input_xyz=cfg.models.coarse.include_input_xyz,
         include_input_dir=cfg.models.coarse.include_input_dir,
         use_viewdirs=cfg.models.coarse.use_viewdirs,
@@ -303,6 +294,7 @@ def main():
         model_fine = getattr(models, cfg.models.fine.type)(
             num_encoding_fn_xyz=cfg.models.fine.num_encoding_fn_xyz,
             num_encoding_fn_dir=cfg.models.fine.num_encoding_fn_dir,
+            num_identity=cfg.dataset.num_identity,
             include_input_xyz=cfg.models.fine.include_input_xyz,
             include_input_dir=cfg.models.fine.include_input_dir,
             use_viewdirs=cfg.models.fine.use_viewdirs,
@@ -376,6 +368,7 @@ def main():
     render_poses = poses[i_test].float().to(device)
     #expressions = torch.arange(-6,6,0.5).float().to(device)
     render_expressions = expressions[i_test].float().to(device)
+    render_ids = ids[i_test].to(device)
     #avg_img = torch.mean(images[i_train],axis=0)
     #avg_img = torch.ones_like(avg_img)
 
@@ -384,52 +377,12 @@ def main():
     index_of_image_after_train_shuffle = 0
     # render_expressions = render_expressions[[300]] ### TODO render specific expression
 
-    #######################
-    no_background = False
-    no_expressions = False
-    no_lcode = False
-    nerf = False
-    frontalize = False
-    interpolate_mouth = False
-
-    #######################
-    if nerf:
-        no_background = True
-        no_expressions = True
-        no_lcode = True
-    if no_background: background=None
-    if no_expressions: render_expressions = torch.zeros_like(render_expressions, device=render_expressions.device)
-    if no_lcode:
-        use_latent_code = True
-        latent_codes = torch.zeros(5000,32,device=device)
-
     for i, expression in enumerate(tqdm(render_expressions)):
-    #for i in range(75,151):
-
-
-
-
-        # if i%25 != 0: ### TODO generate only every 25th im
-        #if i != 511: ### TODO generate only every 25th im
-        #    continue
         start = time.time()
         rgb = None, None
         disp = None, None
         with torch.no_grad():
             pose = render_poses[i]
-
-            if interpolate_mouth:
-                frame_id = 241
-                num_images = 150
-                pose = render_poses[241]
-                expression = render_expressions[241].clone()
-                expression[68] = torch.arange(-1, 1, 2 / 150, device=device)[i]
-
-            if frontalize:
-                pose = render_poses[0]
-            #pose = render_poses[300] ### TODO fixes pose
-            #expression = render_expressions[0] ### TODO fixes expr
-            #expression = torch.zeros_like(expression).to(device)
 
             ablate = 'view_dir'
 
@@ -444,6 +397,7 @@ def main():
             elif ablate == 'view_dir':
                 pose = render_poses[i]
                 expression = render_expressions[i]
+                id = render_ids[i]
                 _, ray_directions_ablation = get_ray_bundle(hwf[0], hwf[1], hwf[2], render_poses[240+i][:3, :4])
 
             pose = pose[:3, :4]
@@ -474,6 +428,7 @@ def main():
                 encode_position_fn=encode_position_fn,
                 encode_direction_fn=encode_direction_fn,
                 expressions = expression,
+                ids = id,
                 background_prior = background.view(-1,3) if (background is not None) else None,
                 #background_prior = torch.ones_like(background).view(-1,3),  # White background
                 latent_code = latent_code,

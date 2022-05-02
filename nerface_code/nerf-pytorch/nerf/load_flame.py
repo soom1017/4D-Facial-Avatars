@@ -43,10 +43,13 @@ def pose_spherical(theta, phi, radius):
     return c2w
 
 
-def load_flame_data(basedir, half_res=False, testskip=1, debug=False, expressions=True, load_bbox=True, test=False):
+def load_flame_data(basedir, half_res=False, testskip=1, debug=False, expressions=True, load_bbox=True, test=False, id=0):
     print("starting data loading")
 
-    dataset_dirs = load_dataset_dirs(basedir)
+    if test:
+        dataset_dirs = [basedir]
+    else:
+        dataset_dirs = load_dataset_dirs(basedir)
     all_imgs = []
     all_poses = []
     all_expressions = []
@@ -93,7 +96,7 @@ def load_flame_data(basedir, half_res=False, testskip=1, debug=False, expression
             expressions = np.array(expressions).astype(np.float32)
             bboxs = np.array(bboxs).astype(np.float32)
             # id coef added
-            ids = np.full(imgs.shape[0], i)
+            ids = np.full(imgs.shape[0], id)
 
             counts[j] += imgs.shape[0]
             all_imgs.append(imgs)
